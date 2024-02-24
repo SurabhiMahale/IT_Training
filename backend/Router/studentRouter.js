@@ -1,103 +1,65 @@
-import express from 'express';
-import Student from '../Schema/studentSchema.js';
+import express from "express";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import validator from "validator";
+import Student from "../Models/studentSchema.js"; 
 
-const studentRouter = express.Router();
+const router = express.Router();
 
-// POST 
-studentRouter.post('/', async (req, res) => {
+// Authorization routes
+router.post("/register", async (req, res) => {
   try {
-    const {
-      firstName,
-      lastName,
-      email,
-      password,
-      username,
-      courseProgress,
-      contactInformation
-    } = req.body;
-
-    const existingStudent = await Student.findOne({ email });
-
-    if (existingStudent) {
-      return res.status(400).json({ message: 'Student already exists' });
+    const { firstName, lastName, email, password, contactInformation } = req.body;
+9
+    // Validate email format
+    if (!validator.isEmail(email)) {
+      return res.status(400).send({ msg: "Invalid email format" });
     }
 
-    const newStudent = await Student.create({
+    // Validate password length
+    if (!validator.isLength(password, { min: 6 })) {
+      return res.status(400).send({ msg: "Password must be at least 6 characters long" });
+    }
+
+    const emailExists = await Student.findOne({ email });
+    if (emailExists) {
+      return res.status(400).send({ msg: "Email already exists!" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const newStudent = new Student({
       firstName,
       lastName,
       email,
-      password,
-      username,
-      courseProgress,
+      password: hashedPassword,
       contactInformation
     });
 
-    res.status(201).json({ message: 'Student added successfully', data: newStudent });
+    await newStudent.save();
+    res.status(200).send({ msg: "Registered successfully!" });
   } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ message: 'Failed to add student', error: error.message });
+    res.status(500).send({ msg: error.message });
   }
 });
 
-// GET 
-studentRouter.get('/', async (req, res) => {
+router.post("/login", async (req, res) => {
   try {
-    const students = await Student.find();
-    res.json(students);
-  } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ message: 'Failed to fetch students', error: error.message });
-  }
-});
-
-// PUT
-studentRouter.put('/:id', async (req, res) => {
-  try {
-    const {
-      firstName,
-      lastName,
-      email,
-      password,
-      username,
-      courseProgress,
-      contactInformation
-    } = req.body;
-
-    const updatedStudent = await Student.findByIdAndUpdate(req.params.id, {
-      firstName,
-      lastName,
-      email,
-      password,
-      username,
-      courseProgress,
-      contactInformation
-    }, { new: true });
-
-    if (!updatedStudent) {
-      return res.status(404).json({ message: 'Student not found' });
+    const { email, password } = req.body;
+    const existingStudent = await Student.findOne({ email });
+    if (!existingStudent) {
+      return res.status(400).send({ msg: "Email doesn't exist!" });
     }
-
-    res.json({ message: 'Student updated successfully', data: updatedStudent });
-  } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ message: 'Failed to update student', error: error.message });
-  }
-});
-
-// DELETE 
-studentRouter.delete('/:id', async (req, res) => {
-  try {
-    const deletedStudent = await Student.findByIdAndDelete(req.params.id);
-
-    if (!deletedStudent) {
-      return res.status(404).json({ message: 'Student not found' });
+    const isPasswordCorrect = await bcrypt.compare(password, existingStudent.password);
+    if (!isPasswordCorrect) {
+      return res.status(400).send({ msg: "Password Incorrect!" });
     }
-
-    res.sendStatus(204);
+    
+    const token = jwt.sign({ _id: existingStudent._id }, process.env.JWT_SECRET);
+    // console.log("Token:", token );
+    res.status(200).send({ msg: "Login successful!", token });
   } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ message: 'Failed to delete student', error: error.message });
+    res.status(500).send({ msg: error.message });
   }
 });
-
-export default studentRouter;
+export default router;

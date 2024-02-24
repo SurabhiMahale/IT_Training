@@ -18,17 +18,9 @@ const studentSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  username: {
-    type: String,
-    required: true,
-    unique: true
-  },
   registrationDate: {
     type: Date,
     default: Date.now
-  },
-  courseProgress: {
-    type: Object // we can define this more precisely based on needs
   },
   contactInformation: {
     type: Object 
